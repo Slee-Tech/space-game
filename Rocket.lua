@@ -32,6 +32,7 @@ function Rocket:update(dt)
     -- check for laser shot
     if love.keyboard.wasPressed('space') then
         self.shoot = true
+        sounds['laser']:play()
     end
 
 end

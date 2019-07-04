@@ -3,23 +3,17 @@ require 'Laser'
 require 'Rocket'
 require 'Meteor'
 
+-- all code related to game state and state machines
+require 'StateMachine'
+require 'states/BaseState'
+require 'states/PlayState'
+require 'states/TitleState'
+require 'states/ScoreState'
+
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
-
-local background = love.graphics.newImage('space.jpg')
-local font = love.graphics.newFont(15)
-local rocket = Rocket()
-local scrolling = true
-local timerScore = 0
-
-local meteors = {}
-local shots = {}
-local timer = 0
-local reduceTimer = 2
-local meteorsHit = 0
-local backgroundScroll = 0
-local backgroundScrollSpeed = 200
-local backgroundLoopPoint = 721
+font = love.graphics.newFont(15)
+titleFont = love.graphics.newFont(50)
 
 function love.load()
     math.randomseed(os.time())
@@ -31,6 +25,22 @@ function love.load()
         fullscreen = false
     })
     love.window.setTitle('Space Game')
+
+    sounds = {
+        ['collide'] = love.audio.newSource('sounds/collide.wav', 'static'),
+        ['laser'] = love.audio.newSource('sounds/laser.wav', 'static'),
+        ['play'] = love.audio.newSource('sounds/play.wav', 'static'),
+        ['title'] = love.audio.newSource('sounds/title.wav', 'static')
+    }    
+
+    -- initialize state machine with all state-returning functions
+    gStateMachine = StateMachine {
+        ['title'] = function() return TitleState() end,
+        ['play'] = function() return PlayState() end,
+        ['score'] = function() return ScoreState() end,
+    }
+    gStateMachine:change('title')
+
     love.keyboard.keyPressed = {}
 end
 
@@ -51,86 +61,12 @@ function love.keyboard.wasPressed(key)
 end
 
 function love.update(dt)
-    if scrolling then 
-
-    backgroundScroll = (backgroundScroll + backgroundScrollSpeed * dt) % backgroundLoopPoint
-    
-    timerScore = timerScore + dt
-    
-    -- add meteors
-    timer = timer + dt
-    if timer > reduceTimer then
-        table.insert(meteors, Meteor())
-        timer = 0
-        reduceTimer = reduceTimer - .05
-        if reduceTimer < .5 then
-            reduceTimer = .5
-        end
-    end
-    
-    -- update rocket
-    rocket:update(dt)
-
-    -- checks for laser shot than addes it to shots table
-    if rocket.shoot then
-        table.insert(shots, Laser(rocket))
-        rocket.shoot = false
-    end
-
-    -- update meteors
-    for k, meteor in pairs(meteors) do
-        meteor:update(dt)
-        if meteor.y > WINDOW_HEIGHT then
-            table.remove(meteors, k)
-        end
-
-        -- will switch to score state here after rocket is hit
-        if rocket:collides(meteor) then
-            scrolling = false
-        end
-
-    end
-
-    -- add shots then update them
-    for s, shot in pairs(shots) do
-        shot:update(dt)
-
-        if shot.y < 0 then
-            table.remove(shots, s)
-        end
-        -- check if shot collides with a meteor
-        for i, meteor in pairs(meteors) do
-            if shot:collides(meteor) then
-                table.remove(meteors, i)
-                table.remove(shots, s)
-                meteorsHit = meteorsHit + 1
-            end
-        end
-    end
-
-end
+    -- all game logic moved to states
+    gStateMachine:update(dt)
     love.keyboard.keyPressed = {}
 end
 
 function love.draw()
-    -- scrolls background image
-    love.graphics.draw(background, 0, -backgroundScroll)
-    
-    -- displays current time and score
-    love.graphics.print('Time: ' .. math.floor(timerScore), 20, 15)
-    love.graphics.print('Score: ' .. meteorsHit, 110, 15)
-
-    -- render rocket
-    rocket:render()
-
-    -- render meteors
-    for k, meteor in pairs(meteors) do
-        meteor:render()
-    end
-
-    -- render shots
-    for s, shot in pairs(shots) do
-        shot:render()
-    end
-   
+    -- all rendering moved to states
+    gStateMachine:render()
 end
